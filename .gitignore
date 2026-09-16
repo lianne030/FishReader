@@ -1,0 +1,11 @@
+FishReaderData/
+书单/
+logs/
+zlibrary-mcp-upstream/
+dist/
+.tools/
+AGENTS.md
+*.epub
+*.mobi
+*.azw3
+*.pdf
