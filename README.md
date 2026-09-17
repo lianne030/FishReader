@@ -15,7 +15,7 @@ FishReader 是一个适用于 Windows 的透明悬浮小说阅读器。解压后
 
 ## 立即使用
 
-1. 从 GitHub Releases 下载 `FishReader-portable.zip`。
+1. 从仓库中的 [`dist/FishReader-portable.zip`](https://github.com/lianne030/FishReader/raw/refs/heads/main/dist/FishReader-portable.zip) 下载便携包。
 2. 解压到任意文件夹。
 3. 双击 `启动阅读器.cmd`。
 4. 在透明窗口内右键，选择“打开小说”。
