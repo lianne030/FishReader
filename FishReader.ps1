@@ -122,7 +122,7 @@ function Load-Book([string]$path) {
 [xml]$xaml = @'
 <Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" AllowsTransparency="True" Background="Transparent" WindowStyle="None" ResizeMode="CanResize" ShowInTaskbar="False" Topmost="True">
   <Border x:Name="Shell" Background="#01000000" Padding="14" CornerRadius="3">
-    <TextBlock x:Name="ReaderText" TextWrapping="Wrap" FontFamily="Microsoft YaHei UI" Foreground="#D3C6AA" LineStackingStrategy="BlockLineHeight" LineHeight="35"/>
+    <TextBlock x:Name="ReaderText" TextWrapping="Wrap" FontFamily="Microsoft YaHei UI" Foreground="#D3C6AA" LineStackingStrategy="MaxHeight" LineHeight="35"/>
   </Border>
 </Window>
 '@
@@ -145,6 +145,20 @@ function Format-PageText([string]$value) {
   return [regex]::Replace($value, "`n[ `t]*`n+", $break).Trim()
 }
 
+function Get-PageViewport {
+  $layoutWidth = if ($shell.ActualWidth -gt 40) { [double]$shell.ActualWidth } else { [double]$window.Width }
+  $layoutHeight = if ($shell.ActualHeight -gt 40) { [double]$shell.ActualHeight } else { [double]$window.Height }
+  $paddingX = [double]$shell.Padding.Left + [double]$shell.Padding.Right
+  $paddingY = [double]$shell.Padding.Top + [double]$shell.Padding.Bottom
+  # Leave a small render safety margin: WPF can round the final baseline differently
+  # from the off-screen TextBlock used for pagination, especially on fractional DPI.
+  $renderSafety = [math]::Max(3, [math]::Ceiling([double]$textBlock.FontSize * 0.1))
+  return @{
+    MaxWidth = [math]::Max(1, $layoutWidth - $paddingX)
+    MaxHeight = [math]::Max(1, $layoutHeight - $paddingY - $renderSafety)
+  }
+}
+
 
 function Set-ClickThrough([bool]$enabled) {
   $script:settings.ClickThrough=$enabled
@@ -156,16 +170,15 @@ function Set-ClickThrough([bool]$enabled) {
 function Test-PageFit([int]$start, [int]$length, [double]$maxWidth, [double]$maxHeight) {
   $probe = New-Object Windows.Controls.TextBlock
   $probe.TextWrapping = 'Wrap'; $probe.FontFamily = $textBlock.FontFamily; $probe.FontSize = $textBlock.FontSize
-  $probe.LineStackingStrategy = 'BlockLineHeight'; $probe.LineHeight = $textBlock.LineHeight
+  $probe.LineStackingStrategy = 'MaxHeight'; $probe.LineHeight = $textBlock.LineHeight
   $probe.Text = Format-PageText $bookText.Substring($start, $length)
   $probe.Measure((New-Object Windows.Size($maxWidth, [double]::PositiveInfinity)))
   return $probe.DesiredSize.Height -le ($maxHeight + 0.5)
 }
 function Get-PageEnd([int]$start) {
   $remaining = $bookText.Length - $start; if ($remaining -le 0) { return $bookText.Length }
-  $layoutWidth = if ($window.ActualWidth -gt 40) { $window.ActualWidth } else { $window.Width }
-  $layoutHeight = if ($window.ActualHeight -gt 40) { $window.ActualHeight } else { $window.Height }
-  $maxWidth = [math]::Max(1, $layoutWidth - 28); $maxHeight = [math]::Max(1, $layoutHeight - 28)
+  $viewport = Get-PageViewport
+  $maxWidth = [double]$viewport.MaxWidth; $maxHeight = [double]$viewport.MaxHeight
   $rough = [int][math]::Max(256, [math]::Ceiling((($maxWidth / $textBlock.FontSize) * ($maxHeight / $textBlock.LineHeight)) * 2))
   $low = 0; $high = [math]::Min($remaining, $rough)
   while ((Test-PageFit $start $high $maxWidth $maxHeight)) {
